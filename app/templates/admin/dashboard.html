@@ -1,0 +1,246 @@
+{% extends "admin/layout.html" %}
+
+{% block admin_content %}
+<div id="admin-live-dashboard">
+
+  <!-- Top Controls & Hostel Filter Bar -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+      <h2>📊 Live Food Estimation & Meal Demand (IST)</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Kitchen Clock: <strong style="color: var(--primary-dark);">{{ current_time_ist }}</strong> | Real-time demand forecasting to prevent kitchen overcooking.
+      </p>
+    </div>
+
+
+    <!-- Filter by Hostel / Building -->
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <form method="GET" action="/admin/dashboard" style="display: flex; align-items: center; gap: 0.5rem;">
+        <label for="admin-hostel-filter" style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-muted);">
+          Building / Hostel:
+        </label>
+        <select id="admin-hostel-filter" name="hostel_id" class="form-control" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.88rem;" onchange="this.form.submit()">
+          <option value="">🏢 All Hostels & PGs</option>
+          {% for h in hostels %}
+            <option value="{{ h.id }}" {% if selected_hostel_id and selected_hostel_id == h.id %}selected{% endif %}>
+              {{ h.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+
+      <a href="/admin/meals" class="btn btn-primary btn-sm">+ Create Meal</a>
+    </div>
+  </div>
+
+  <!-- Summary KPI Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Active Residents</div>
+      <div class="stat-value" id="total-residents-count">{{ total_residents }}</div>
+      <div class="stat-subtext">Registered in selected hostel(s)</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Estimated Servings to Cook Today</div>
+      <div class="stat-value" id="total-recommended-sum" style="color: var(--primary-dark);">{{ total_portions_recommended }}</div>
+      <div class="stat-subtext">Across all scheduled meals</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Today's Avg Response Rate</div>
+      <div class="stat-value" id="avg-response-rate-stat" style="color: var(--secondary);">{{ avg_response_rate }}%</div>
+      <div class="stat-subtext">Residents who submitted advance choice</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Active Estimation Mode</div>
+      <div class="stat-value" id="active-mode-badge" style="font-size: 1.3rem; margin-top: 0.6rem; color: #b45309;">
+        {{ estimation_mode|upper }} MODE
+      </div>
+      <div class="stat-subtext">Buffer: {{ buffer_percent }}%</div>
+    </div>
+  </div>
+
+  <!-- Interactive Buffer and Calculation Mode Control Panel -->
+  <div class="card" style="margin-bottom: 2rem; border-top: 4px solid var(--primary);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <div>
+        <h3 style="font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+          ⚙️ Food Demand Calculation Controls
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--neutral-muted);">
+          Change safety buffer and how unresponded residents are counted. Updates cards automatically.
+        </p>
+      </div>
+      <div>
+        <span style="font-size: 0.78rem; font-weight: 700; color: var(--neutral-muted); text-transform: uppercase;">
+          Live sync enabled (updates every 3.5s) 🟢
+        </span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; align-items: center; background: #f8fafc; padding: 1.25rem; border-radius: var(--radius-md);">
+      
+      <!-- Buffer Selector -->
+      <div>
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--neutral-dark); margin-bottom: 0.45rem;">
+          1. Safety Buffer Percentage:
+        </label>
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="pill-group">
+            <button type="button" class="pill-btn buffer-pill {% if buffer_percent == 5.0 %}active{% endif %}" data-buffer="5" onclick="setBuffer(5, this)">5%</button>
+            <button type="button" class="pill-btn buffer-pill {% if buffer_percent == 10.0 %}active{% endif %}" data-buffer="10" onclick="setBuffer(10, this)">10% (Default)</button>
+            <button type="button" class="pill-btn buffer-pill {% if buffer_percent == 15.0 %}active{% endif %}" data-buffer="15" onclick="setBuffer(15, this)">15%</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.3rem;">
+            <input type="number" id="custom-buffer-input" placeholder="Custom %" min="0" max="50" step="1" 
+                   value="{% if buffer_percent not in [5.0, 10.0, 15.0] %}{{ buffer_percent }}{% endif %}"
+                   style="width: 90px; padding: 0.4rem 0.6rem; font-size: 0.85rem; border: 1px solid var(--neutral-border); border-radius: var(--radius-sm);"
+                   onchange="setCustomBuffer(this.value)">
+            <span style="font-size: 0.85rem; color: var(--neutral-muted);">%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode Selector -->
+      <div>
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: var(--neutral-dark); margin-bottom: 0.45rem;">
+          2. No-Response Calculation Rule:
+        </label>
+        <div class="pill-group" style="width: 100%;">
+          <button type="button" class="pill-btn mode-pill {% if estimation_mode == 'conservative' %}active{% endif %}" data-mode="conservative" onclick="setMode('conservative', this)">
+            🛡️ Conservative
+          </button>
+          <button type="button" class="pill-btn mode-pill {% if estimation_mode == 'standard' %}active{% endif %}" data-mode="standard" onclick="setMode('standard', this)">
+            ⚖️ Standard (40%)
+          </button>
+          <button type="button" class="pill-btn mode-pill {% if estimation_mode == 'strict' %}active{% endif %}" data-mode="strict" onclick="setMode('strict', this)">
+            🎯 Strict
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Meals Real-Time Cards -->
+  <div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.2rem; margin-bottom: 1rem; color: var(--neutral-dark);">
+      Today's Scheduled Meals & Real-Time Cooking Requirements
+    </h3>
+
+    {% if not meal_summaries %}
+      <div class="card" style="text-align: center; padding: 3rem 1rem;">
+        <h4>No meals found for today.</h4>
+        <p style="color: var(--neutral-muted); margin-top: 0.25rem;">
+          Create a meal schedule to start collecting resident demand.
+        </p>
+        <a href="/admin/meals" class="btn btn-primary btn-sm" style="margin-top: 1rem;">+ Create Meal</a>
+      </div>
+    {% else %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
+        {% for meal in meal_summaries %}
+          <div id="admin-meal-card-{{ meal.id }}" class="card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid {% if meal.meal_type == 'breakfast' %}#10b981{% elif meal.meal_type == 'lunch' %}#0284c7{% else %}#8b5cf6{% endif %};">
+            <div>
+              <!-- Card Top -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div>
+                  <h3 style="font-size: 1.25rem; text-transform: capitalize;">
+                    {% if meal.meal_type == 'breakfast' %}🍳 Breakfast
+                    {% elif meal.meal_type == 'lunch' %}🍛 Lunch
+                    {% elif meal.meal_type == 'dinner' %}🍲 Dinner
+                    {% else %}☕ Snacks{% endif %}
+                  </h3>
+                  <div style="font-size: 0.82rem; color: var(--neutral-muted);">
+                    Serving Time: {{ meal.time_display }} | Deadline: {{ meal.deadline_display }}
+                  </div>
+                </div>
+                <div>
+                  {% if meal.is_closed %}
+                    <span class="status-badge badge-closed">⚪ Closed</span>
+                  {% else %}
+                    <span class="status-badge badge-open">🔵 Open</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Menu Items Preview -->
+              <div class="menu-box" style="margin: 0.5rem 0 1rem 0; font-size: 0.85rem;">
+                <strong>Menu:</strong> {{ meal.menu_items }}
+              </div>
+
+              <!-- Response Counts Breakdown (Section 4 Format) -->
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; margin-bottom: 1rem;">
+                <div style="background: var(--primary-bg); border: 1px solid var(--primary-border); padding: 0.65rem 0.25rem; border-radius: var(--radius-md);">
+                  <div style="font-size: 0.75rem; font-weight: 700; color: var(--primary-dark);">🟢 WILL EAT</div>
+                  <div id="count-will-eat-{{ meal.id }}" style="font-size: 1.4rem; font-weight: 800; color: var(--primary-dark); margin-top: 0.15rem;">
+                    {{ meal.will_eat }}
+                  </div>
+                </div>
+
+                <div style="background: var(--danger-bg); border: 1px solid var(--danger-border); padding: 0.65rem 0.25rem; border-radius: var(--radius-md);">
+                  <div style="font-size: 0.75rem; font-weight: 700; color: var(--danger);">🔴 NOT EATING</div>
+                  <div id="count-not-eating-{{ meal.id }}" style="font-size: 1.4rem; font-weight: 800; color: #991b1b; margin-top: 0.15rem;">
+                    {{ meal.not_eating }}
+                  </div>
+                </div>
+
+                <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 0.65rem 0.25rem; border-radius: var(--radius-md);">
+                  <div style="font-size: 0.75rem; font-weight: 700; color: #b45309;">🟡 NO RESPONSE</div>
+                  <div id="count-no-response-{{ meal.id }}" style="font-size: 1.4rem; font-weight: 800; color: #92400e; margin-top: 0.15rem;">
+                    {{ meal.no_response }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Estimated Cooking Requirement Highlight (Section 5) -->
+              <div style="background: linear-gradient(135deg, #064e3b, #059669); color: white; padding: 1.1rem; border-radius: var(--radius-md); text-align: center; margin-bottom: 0.85rem;">
+                <div style="font-size: 0.82rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; opacity: 0.9;">
+                  Recommended Cooking Quantity
+                </div>
+                <div style="font-size: 2.2rem; font-weight: 900; margin: 0.2rem 0;">
+                  <span id="rec-servings-{{ meal.id }}">{{ meal.recommended_servings }}</span>
+                  <span style="font-size: 1rem; font-weight: 600; opacity: 0.85;">servings</span>
+                </div>
+                <!-- Transparent Calculation Formula Display (Section 5) -->
+                <div id="formula-box-{{ meal.id }}" style="font-size: 0.78rem; opacity: 0.92; background: rgba(0,0,0,0.18); padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); margin-top: 0.35rem;">
+                  {{ meal.formula_display }}
+                </div>
+              </div>
+
+              <!-- Response Rate & Status -->
+              <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--neutral-muted); margin-bottom: 0.85rem;">
+                <span>Response Rate: <strong id="resp-rate-{{ meal.id }}">{{ meal.response_rate }}%</strong></span>
+                <span>Total Population: <strong>{{ total_residents }}</strong></span>
+              </div>
+            </div>
+
+            <!-- Card Bottom Actions -->
+            <div style="padding-top: 0.85rem; border-top: 1px solid var(--neutral-border); display: flex; gap: 0.5rem; justify-content: space-between; align-items: center;">
+              {% if not meal.is_closed %}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="broadcastReminder({{ meal.id }}, this)">
+                  📢 Notify Residents
+                </button>
+              {% else %}
+                {% if meal.consumption %}
+                  <span style="font-size: 0.8rem; color: var(--primary-dark); font-weight: 600;">
+                    ✅ Actual Recorded: {{ meal.consumption.actual_eaters }} ate / {{ meal.consumption.estimated_wasted_portions }} wasted
+                  </span>
+                {% else %}
+                  <a href="/admin/consumption" class="btn btn-primary btn-sm">
+                    ⚖️ Record Consumption
+                  </a>
+                {% endif %}
+              {% endif %}
+
+              <a href="/admin/meals" style="font-size: 0.82rem; font-weight: 600; color: var(--secondary);">
+                Manage &rarr;
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

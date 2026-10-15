@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Admin & Mess Staff Portal - SmartMess{% endblock %}
+
+{% block content %}
+<div class="container-mobile" style="padding-top: 3rem; padding-bottom: 3rem;">
+  <div class="card" style="box-shadow: var(--shadow-lg); border-top: 4px solid var(--secondary);">
+    <div style="text-align: center; margin-bottom: 1.75rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📊</div>
+      <h2>Mess Staff & Admin Portal</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem; margin-top: 0.25rem;">
+        Access real-time meal counts, demand forecasts, and waste reduction analytics.
+      </p>
+    </div>
+
+    {% if error %}
+      <div style="background: var(--danger-bg); border-left: 4px solid var(--danger); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; color: #991b1b; font-size: 0.9rem;">
+        ⚠️ {{ error }}
+      </div>
+    {% endif %}
+
+    <form method="POST" action="/admin/login">
+      <div class="form-group">
+        <label class="form-label" for="email">Admin Email</label>
+        <input type="email" id="email" name="email" class="form-control" placeholder="admin@smartmess.com" value="{{ email or '' }}" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem; background: var(--secondary);">
+        Sign In as Mess Admin &rarr;
+      </button>
+    </form>
+
+    <!-- Quick Demo Admin Fillers -->
+    <div style="margin-top: 2rem; padding: 1rem; background: #f8fafc; border: 1px dashed var(--neutral-border); border-radius: var(--radius-md);">
+      <p style="font-size: 0.8rem; font-weight: 700; color: var(--neutral-muted); text-transform: uppercase; margin-bottom: 0.5rem;">
+        ⚡ Instant Admin Demo Logins:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="quickFillAdmin('admin@smartmess.com', 'admin123')" style="justify-content: flex-start;">
+          🛡️ <strong>Chief Mess Officer</strong> (All Hostels Superadmin)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="quickFillAdmin('manager@hostel.edu', 'admin123')" style="justify-content: flex-start;">
+          👨‍🍳 <strong>Ramesh Kumar</strong> (Boys Hostel Supervisor)
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+      <a href="/login" style="color: var(--neutral-muted);">&larr; Return to Student Resident Portal</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function quickFillAdmin(email, pass) {
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = pass;
+  document.forms[0].submit();
+}
+</script>
+{% endblock %}

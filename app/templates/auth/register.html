@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Resident Registration - SmartMess{% endblock %}
+
+{% block content %}
+<div class="container-mobile" style="padding-top: 2rem; padding-bottom: 3rem;">
+  <div class="card" style="box-shadow: var(--shadow-lg);">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">📝</div>
+      <h2>Resident Registration</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Register to join your hostel's food demand planning system.
+      </p>
+    </div>
+
+    {% if error %}
+      <div style="background: var(--danger-bg); border-left: 4px solid var(--danger); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; color: #991b1b; font-size: 0.9rem;">
+        ⚠️ {{ error }}
+      </div>
+    {% endif %}
+
+    <form method="POST" action="/register">
+      <div class="form-group">
+        <label class="form-label" for="full_name">Full Name *</label>
+        <input type="text" id="full_name" name="full_name" class="form-control" placeholder="e.g. Rahul Sharma" value="{{ full_name or '' }}" required>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address *</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="rahul@college.edu" value="{{ email or '' }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="phone">Phone / WhatsApp *</label>
+          <input type="tel" id="phone" name="phone" class="form-control" placeholder="9876543210" value="{{ phone or '' }}" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="student_id">Student ID / Roll No. *</label>
+        <input type="text" id="student_id" name="student_id" class="form-control" placeholder="e.g. 2024CS045" value="{{ student_id or '' }}" required>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label class="form-label" for="hostel_id">Hostel / Building *</label>
+          <select id="hostel_id" name="hostel_id" class="form-control" required>
+            <option value="">Select Hostel...</option>
+            {% for h in hostels %}
+              <option value="{{ h.id }}" {% if hostel_id and hostel_id == h.id %}selected{% endif %}>
+                {{ h.name }} ({{ h.code }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="room_number">Room No. *</label>
+          <input type="text" id="room_number" name="room_number" class="form-control" placeholder="e.g. 204" value="{{ room_number or '' }}" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Create Password *</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="At least 6 characters" minlength="6" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;">
+        Complete Registration & View Dashboard
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: var(--neutral-muted);">
+      Already registered? <a href="/login" style="font-weight: 600;">Sign in here</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

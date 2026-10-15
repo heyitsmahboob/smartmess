@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Resident Login - SmartMess{% endblock %}
+
+{% block content %}
+<div class="container-mobile" style="padding-top: 2.5rem; padding-bottom: 2.5rem;">
+  <div class="card" style="box-shadow: var(--shadow-lg);">
+    <div style="text-align: center; margin-bottom: 1.75rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🍲</div>
+      <h2>Resident Login</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.95rem; margin-top: 0.25rem;">
+        Sign in to respond to daily meals and help eliminate food waste.
+      </p>
+    </div>
+
+    {% if error %}
+      <div style="background: var(--danger-bg); border-left: 4px solid var(--danger); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; color: #991b1b; font-size: 0.9rem;">
+        ⚠️ {{ error }}
+      </div>
+    {% endif %}
+
+    {% if success %}
+      <div style="background: var(--primary-bg); border-left: 4px solid var(--primary); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; color: var(--primary-dark); font-size: 0.9rem;">
+        ✅ {{ success }}
+      </div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <div class="form-group">
+        <label class="form-label" for="identifier">Email, Student ID, or Phone</label>
+        <input type="text" id="identifier" name="identifier" class="form-control" placeholder="e.g. arjun@hostel.edu or 2024CS001" value="{{ identifier or '' }}" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <label class="form-label" for="password" style="margin-bottom: 0;">Password</label>
+          <a href="/forgot-password" style="font-size: 0.82rem; color: var(--primary);">Forgot password?</a>
+        </div>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="padding: 0.85rem; font-size: 1rem; margin-top: 0.5rem;">
+        Sign In to My Meals
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: var(--neutral-muted);">
+      Don't have an account yet? <a href="/register" style="font-weight: 600;">Register as Resident</a>
+    </div>
+
+    <!-- Quick Demo Accounts for Testing -->
+    <div style="margin-top: 2rem; padding-top: 1.25rem; border-top: 1px dashed var(--neutral-border); background: #fdfdfd; border-radius: var(--radius-md); padding: 1rem;">
+      <p style="font-size: 0.8rem; font-weight: 700; color: var(--neutral-muted); text-transform: uppercase; margin-bottom: 0.6rem;">
+        ⚡ Instant Demo Logins:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="quickFillResident('arjun@hostel.edu', 'student123')" style="justify-content: flex-start; text-align: left;">
+          👤 <strong>Arjun Sharma</strong> (Boys Hostel A, Room 101)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="quickFillResident('priya@hostel.edu', 'student123')" style="justify-content: flex-start; text-align: left;">
+          👤 <strong>Priya Patel</strong> (Girls Hostel A, Room 205)
+        </button>
+      </div>
+      <div style="margin-top: 0.75rem; text-align: center;">
+        <a href="/admin/login" style="font-size: 0.82rem; color: var(--secondary); font-weight: 600;">
+          Switch to Admin Portal &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function quickFillResident(email, pass) {
+  document.getElementById('identifier').value = email;
+  document.getElementById('password').value = pass;
+  document.forms[0].submit();
+}
+</script>
+{% endblock %}

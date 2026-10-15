@@ -1,0 +1,1 @@
+# SmartMess application package

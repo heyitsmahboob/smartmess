@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Portal - SmartMess{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  <!-- Admin Sidebar Navigation -->
+  <aside class="admin-sidebar">
+    <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--neutral-border);">
+      <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--neutral-muted); letter-spacing: 0.05em;">
+        Kitchen Management
+      </div>
+      <div style="font-size: 1.05rem; font-weight: 800; color: var(--neutral-dark); margin-top: 0.2rem;">
+        Mess Control Center
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="/admin/dashboard" class="sidebar-link {% if request.url.path == '/admin/dashboard' %}active{% endif %}">
+        <span>📊</span>
+        <span>Real-Time Demand</span>
+      </a>
+
+      <a href="/admin/meals" class="sidebar-link {% if request.url.path == '/admin/meals' %}active{% endif %}">
+        <span>🍽️</span>
+        <span>Meal Management</span>
+      </a>
+
+      <a href="/admin/consumption" class="sidebar-link {% if request.url.path == '/admin/consumption' %}active{% endif %}">
+        <span>⚖️</span>
+        <span>Post-Meal Consumption</span>
+      </a>
+
+      <a href="/admin/users" class="sidebar-link {% if request.url.path == '/admin/users' %}active{% endif %}">
+        <span>👥</span>
+        <span>Resident Directory</span>
+      </a>
+
+      <a href="/admin/analytics" class="sidebar-link {% if request.url.path == '/admin/analytics' %}active{% endif %}">
+        <span>📈</span>
+        <span>Waste & Demand Analytics</span>
+      </a>
+
+      <a href="/admin/reports" class="sidebar-link {% if request.url.path == '/admin/reports' %}active{% endif %}">
+        <span>📑</span>
+        <span>Reports & CSV Export</span>
+      </a>
+    </nav>
+
+    <!-- Kitchen Operational Status Widget -->
+    <div style="margin-top: 2.5rem; padding: 1rem; background: var(--primary-bg); border: 1px solid var(--primary-border); border-radius: var(--radius-md);">
+      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 700; color: var(--primary-dark);">
+        <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+        KITCHEN LIVE
+      </div>
+      <div style="font-size: 0.82rem; color: #065f46; margin-top: 0.35rem;">
+        Real-time response sync active. Numbers update dynamically.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Admin Main Content Area -->
+  <section class="admin-main">
+    {% block admin_content %}{% endblock %}
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/admin.js"></script>
+{% block admin_extra_js %}{% endblock %}
+{% endblock %}

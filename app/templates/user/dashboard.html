@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Today's Meals - SmartMess Resident Portal{% endblock %}
+
+{% block content %}
+<div class="container-mobile" style="padding-top: 1.25rem; padding-bottom: 2rem;">
+  
+  <!-- Resident Header Banner -->
+  <div style="background: linear-gradient(135deg, #064e3b, #059669); color: white; padding: 1.25rem 1.4rem; border-radius: var(--radius-lg); margin-bottom: 1.25rem; box-shadow: var(--shadow-md);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <span style="font-size: 0.8rem; background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600;">
+          {{ user.hostel_name or 'Hostel' }} • Room {{ user.room_number or 'N/A' }}
+        </span>
+        <h2 style="color: white; margin-top: 0.4rem; font-size: 1.4rem;">
+          Namaste, {{ user.full_name.split(' ')[0] }} 👋
+        </h2>
+        <p style="color: #d1fae5; font-size: 0.88rem; margin-top: 0.15rem;">
+          📅 {{ today_str }} | 🕒 Current: <strong>{{ current_time_display }}</strong>
+        </p>
+      </div>
+      <div style="text-align: right;">
+        <span style="font-size: 1.75rem;">🌱</span>
+      </div>
+    </div>
+
+    <!-- Quick Personal Sustainability Counter -->
+    <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(255,255,255,0.18); font-size: 0.82rem;">
+      <div>
+        <span style="opacity: 0.85;">Responses Given:</span> <strong>{{ total_responses_count }}</strong>
+      </div>
+      <div>
+        <span style="opacity: 0.85;">Confirmed Eaten:</span> <strong>{{ meals_eaten_count }}</strong>
+      </div>
+      <div>
+        <span style="opacity: 0.85;">Wastage Prevented:</span> <strong>~{{ (total_responses_count * 0.4)|round|int }} kg</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Meal Cards Section -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+    <h3 style="font-size: 1.15rem; color: var(--neutral-dark);">Today's Indian Mess Schedule</h3>
+    <span style="font-size: 0.82rem; color: var(--neutral-muted);">1-click advance booking</span>
+  </div>
+
+  {% if not today_meals %}
+    <div class="card" style="text-align: center; padding: 2.5rem 1rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🍽️</div>
+      <h4>No Meals Scheduled for Today</h4>
+      <p style="color: var(--neutral-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+        Check back later or view tomorrow's upcoming meals.
+      </p>
+      <a href="/my-meals" class="btn btn-secondary btn-sm" style="margin-top: 1rem;">View Upcoming Meals</a>
+    </div>
+  {% else %}
+    <div style="display: flex; flex-direction: column; gap: 1.1rem;">
+      {% for meal in today_meals %}
+        {% set status_class = 'status-unresponded' %}
+        {% if meal.is_locked %}
+          {% set status_class = 'status-closed' %}
+        {% elif meal.user_response == 'will_eat' %}
+          {% set status_class = 'status-will-eat' %}
+        {% elif meal.user_response == 'not_eating' %}
+          {% set status_class = 'status-not-eating' %}
+        {% endif %}
+
+        <div id="meal-card-{{ meal.id }}" class="card meal-card {{ status_class }} card-hover">
+          <!-- Meal Header -->
+          <div class="meal-header">
+            <div class="meal-title-group">
+              <h3>
+                {% if meal.meal_type == 'breakfast' %}🍳
+                {% elif meal.meal_type == 'lunch' %}🍛
+                {% elif meal.meal_type == 'dinner' %}🍲
+                {% else %}☕{% endif %}
+                {{ meal.meal_type|capitalize }} — Today
+              </h3>
+              <div class="meal-time-badge">
+                Service: {{ meal.time_display }} IST
+              </div>
+            </div>
+
+            <!-- Current Response Status Badge -->
+            <div id="status-badge-{{ meal.id }}">
+              {% if meal.is_locked %}
+                {% if meal.user_response == 'will_eat' %}
+                  <span class="status-badge badge-will-eat">🟢 Will Eat (Locked)</span>
+                {% elif meal.user_response == 'not_eating' %}
+                  <span class="status-badge badge-not-eating">🔴 Not Eating (Locked)</span>
+                {% else %}
+                  <span class="status-badge badge-closed">⚪ Closed (No Response)</span>
+                {% endif %}
+              {% else %}
+                {% if meal.user_response == 'will_eat' %}
+                  <span class="status-badge badge-will-eat">🟢 Will Eat</span>
+                {% elif meal.user_response == 'not_eating' %}
+                  <span class="status-badge badge-not-eating">🔴 Not Eating</span>
+                {% else %}
+                  <span class="status-badge badge-unresponded">🟡 Not Responded</span>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Menu Items List -->
+          <div class="menu-box">
+            <div style="font-size: 0.78rem; text-transform: uppercase; font-weight: 700; color: var(--neutral-muted); margin-bottom: 0.4rem;">
+              Today's Menu:
+            </div>
+            <div>
+              {% for item in meal.menu_items.split(',') %}
+                <span class="menu-tag">{{ item.strip() }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Deadline info with live second-by-second countdown -->
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--neutral-muted); margin-top: 0.5rem;">
+            <div>
+              <strong>Response Cutoff:</strong> {{ meal.deadline_display }}
+            </div>
+            <div id="countdown-wrapper-{{ meal.id }}">
+              {% if meal.is_paused %}
+                <span id="deadline-pill-{{ meal.id }}" class="status-badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 700; font-size: 0.8rem;">
+                  ⏸️ Responses Paused
+                </span>
+              {% elif meal.is_closed_early %}
+                <span id="deadline-pill-{{ meal.id }}" class="status-badge badge-closed" style="font-weight: 700; font-size: 0.8rem;">
+                  🔒 Closed Early
+                </span>
+              {% elif meal.is_locked %}
+                <span id="deadline-pill-{{ meal.id }}" class="status-badge badge-closed" style="font-weight: 700; font-size: 0.8rem;">
+                  🔒 Closed
+                </span>
+              {% else %}
+                <span id="deadline-pill-{{ meal.id }}" class="status-badge badge-open" data-deadline="{{ meal.iso_deadline }}" style="font-weight: 700; font-size: 0.8rem;">
+                  ⏳ Counting down...
+                </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Lock Notification Banner (Shown when Paused, Closed Early, or Deadline Passed) -->
+          <div id="locked-banner-{{ meal.id }}" style="margin-top: 0.85rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); text-align: center; font-size: 0.85rem; {% if not meal.is_locked %}display: none;{% endif %} {% if meal.is_paused %}background: #fffbeb; color: #b45309; border: 1px solid #fde68a;{% else %}background: #f1f5f9; color: var(--neutral-muted); border: 1px solid var(--neutral-border);{% endif %}">
+            {% if meal.is_paused %}
+              ⏸️ Responses have been temporarily paused by Mess Admin. Kitchen is auditing live counts.
+            {% elif meal.is_closed_early %}
+              🔒 Response window was closed early by Mess Admin. Kitchen preparations are now locked.
+            {% else %}
+              Response deadline ({{ meal.deadline_display }}) has passed. Meal preparations are locked.
+            {% endif %}
+          </div>
+
+          <!-- Container for Response State: Either Choice Buttons OR Confirmed State -->
+          <div id="response-container-{{ meal.id }}" style="margin-top: 1rem; {% if meal.is_locked %}display: none;{% endif %}">
+
+              
+              <!-- State 1: When user has ALREADY responded: Show Confirmed Choice + Change Button (prevents repeated clicking) -->
+              <div id="confirmed-box-{{ meal.id }}" style="{% if not meal.user_response %}display: none;{% endif %} background: {% if meal.user_response == 'will_eat' %}#ecfdf5{% else %}#fef2f2{% endif %}; border: 1px solid {% if meal.user_response == 'will_eat' %}#a7f3d0{% else %}#fecaca{% endif %}; padding: 0.85rem 1rem; border-radius: var(--radius-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                  <div>
+                    <div id="confirmed-text-{{ meal.id }}" style="font-size: 0.95rem; font-weight: 700; color: {% if meal.user_response == 'will_eat' %}#065f46{% else %}#991b1b{% endif %};">
+                      {% if meal.user_response == 'will_eat' %}
+                        ✅ You have confirmed you WILL eat
+                      {% else %}
+                        ❌ You have confirmed you will NOT eat
+                      {% endif %}
+                    </div>
+                    <div id="confirmed-sub-{{ meal.id }}" style="font-size: 0.78rem; color: var(--neutral-muted); margin-top: 0.15rem;">
+                      Choice recorded in kitchen plan • Change allowed until {{ meal.deadline_display }}
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    class="btn btn-secondary btn-sm"
+                    style="border-color: #cbd5e1; font-size: 0.82rem; padding: 0.35rem 0.75rem;"
+                    onclick="promptChangeResponse({{ meal.id }}, '{{ meal.user_response }}', '{{ meal.meal_type|capitalize }}')">
+                    ✏️ Change Response
+                  </button>
+                </div>
+              </div>
+
+              <!-- State 2: When user has NOT responded yet: Show the initial 2 choice buttons -->
+              <div id="initial-buttons-{{ meal.id }}" class="response-actions-grid" style="{% if meal.user_response %}display: none;{% endif %}">
+                <button 
+                  type="button" 
+                  id="btn-eat-{{ meal.id }}" 
+                  class="btn-respond btn-eat"
+                  onclick="submitFirstResponse({{ meal.id }}, 'will_eat', '{{ meal.meal_type|capitalize }}')">
+                  ✅ I will eat
+                </button>
+
+                <button 
+                  type="button" 
+                  id="btn-not-eat-{{ meal.id }}" 
+                  class="btn-respond btn-not-eat"
+                  onclick="submitFirstResponse({{ meal.id }}, 'not_eating', '{{ meal.meal_type|capitalize }}')">
+                  ❌ I will NOT eat
+                </button>
+              </div>
+
+            </div>
+
+            <!-- "Where I See the Change" Instant Feedback Banner -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px dashed var(--neutral-border); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--neutral-muted);">
+              <span>
+                📍 <strong>Where to see this change?</strong>
+                Updates your <a href="/my-meals" style="font-weight: 600; text-decoration: underline;">My Meals</a> & <a href="/notifications" style="font-weight: 600; text-decoration: underline;">Alerts</a>, and instantly updates the <strong>Kitchen Admin Live Count</strong>.
+              </span>
+            </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Quick Link to My Meals -->
+  <div style="margin-top: 1.5rem; text-align: center;">
+    <a href="/my-meals" class="btn btn-secondary btn-block" style="padding: 0.75rem;">
+      📅 Plan Ahead: View Tomorrow's & Upcoming Meals &rarr;
+    </a>
+  </div>
+</div>
+
+<!-- Modal: Deliberate Change Confirmation Dialog (Prevents accidental repeated clicks) -->
+<div id="changeConfirmModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 440px;">
+    <div style="text-align: center; margin-bottom: 1.25rem;">
+      <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">🔄</div>
+      <h3 id="modalMealName">Change Your Response</h3>
+      <p id="modalChangeDesc" style="color: var(--neutral-body); font-size: 0.9rem; margin-top: 0.35rem;">
+        Are you sure you want to change your response?
+      </p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+      <button 
+        type="button" 
+        id="btnConfirmSwitch" 
+        class="btn btn-primary btn-block"
+        style="padding: 0.75rem; font-size: 0.95rem;">
+        Confirm & Update Kitchen Count
+      </button>
+
+      <button 
+        type="button" 
+        class="btn btn-secondary btn-block"
+        onclick="closeModal('changeConfirmModal')">
+        Keep My Current Selection
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Submit initial response (First time selection)
+async function submitFirstResponse(mealId, responseType, mealTitle) {
+  await executeResponseChange(mealId, responseType, mealTitle);
+}
+
+// Prompt deliberate change with modal dialog to prevent accidental rapid toggling
+let pendingMealId = null;
+let pendingNewChoice = null;
+let pendingMealTitle = '';
+
+function promptChangeResponse(mealId, currentChoice, mealTitle) {
+  pendingMealId = mealId;
+  pendingMealTitle = mealTitle;
+  pendingNewChoice = (currentChoice === 'will_eat') ? 'not_eating' : 'will_eat';
+
+  const modalTitle = document.getElementById('modalMealName');
+  const modalDesc = document.getElementById('modalChangeDesc');
+  const confirmBtn = document.getElementById('btnConfirmSwitch');
+
+  if (modalTitle) modalTitle.innerText = `Change ${mealTitle} Response`;
+
+  if (pendingNewChoice === 'will_eat') {
+    modalDesc.innerHTML = `You are currently marked as <strong>NOT Eating</strong>.<br>Do you want to switch to: <strong style="color: #059669;">✅ WILL EAT</strong>?`;
+    confirmBtn.className = 'btn btn-primary btn-block';
+    confirmBtn.innerText = 'Yes, Switch to: WILL EAT';
+  } else {
+    modalDesc.innerHTML = `You are currently marked as <strong>WILL EAT</strong>.<br>Do you want to switch to: <strong style="color: #dc2626;">❌ NOT EATING</strong>?`;
+    confirmBtn.className = 'btn btn-danger btn-block';
+    confirmBtn.innerText = 'Yes, Switch to: NOT EATING';
+  }
+
+  confirmBtn.onclick = async function() {
+    closeModal('changeConfirmModal');
+    await executeResponseChange(pendingMealId, pendingNewChoice, pendingMealTitle);
+  };
+
+  openModal('changeConfirmModal');
+}
+
+// Executes the API call and smoothly locks the confirmed state
+async function executeResponseChange(mealId, choice, mealTitle) {
+  try {
+    const res = await fetch(`/api/meals/${mealId}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response: choice })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.detail || 'Could not update response', 'error');
+      return;
+    }
+
+    // 1. Update Card Border & Status Badge
+    const card = document.getElementById(`meal-card-${mealId}`);
+    const badge = document.getElementById(`status-badge-${mealId}`);
+    const confirmedBox = document.getElementById(`confirmed-box-${mealId}`);
+    const initialButtons = document.getElementById(`initial-buttons-${mealId}`);
+    const confirmedText = document.getElementById(`confirmed-text-${mealId}`);
+    const confirmedSub = document.getElementById(`confirmed-sub-${mealId}`);
+
+    if (choice === 'will_eat') {
+      if (card) {
+        card.classList.remove('status-not-eating', 'status-unresponded');
+        card.classList.add('status-will-eat');
+      }
+      if (badge) {
+        badge.className = 'status-badge badge-will-eat';
+        badge.innerHTML = '🟢 Will Eat';
+      }
+      if (confirmedBox) {
+        confirmedBox.style.display = 'block';
+        confirmedBox.style.background = '#ecfdf5';
+        confirmedBox.style.borderColor = '#a7f3d0';
+      }
+      if (confirmedText) {
+        confirmedText.style.color = '#065f46';
+        confirmedText.innerText = '✅ You have confirmed you WILL eat';
+      }
+      showToast(`Updated to WILL EAT! Kitchen count now: ${data.stats.will_eat} eaters 🍽️`, 'success');
+    } else {
+      if (card) {
+        card.classList.remove('status-will-eat', 'status-unresponded');
+        card.classList.add('status-not-eating');
+      }
+      if (badge) {
+        badge.className = 'status-badge badge-not-eating';
+        badge.innerHTML = '🔴 Not Eating';
+      }
+      if (confirmedBox) {
+        confirmedBox.style.display = 'block';
+        confirmedBox.style.background = '#fef2f2';
+        confirmedBox.style.borderColor = '#fecaca';
+      }
+      if (confirmedText) {
+        confirmedText.style.color = '#991b1b';
+        confirmedText.innerText = '❌ You have confirmed you will NOT eat';
+      }
+      showToast(`Updated to NOT EATING. Saved food! Kitchen count updated 🌱`, 'success');
+    }
+
+    if (confirmedSub && data.timestamp_ist) {
+      confirmedSub.innerText = `Recorded at ${data.timestamp_ist} • Locked in kitchen demand count`;
+    }
+
+    if (initialButtons) initialButtons.style.display = 'none';
+
+    // Update Change button attribute for next deliberate change
+    const changeBtn = confirmedBox ? confirmedBox.querySelector('button') : null;
+    if (changeBtn) {
+      changeBtn.setAttribute('onclick', `promptChangeResponse(${mealId}, '${choice}', '${mealTitle}')`);
+    }
+
+  } catch (err) {
+    showToast('Failed to record response. Please check network.', 'error');
+  }
+}
+</script>
+{% endblock %}

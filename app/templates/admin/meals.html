@@ -1,0 +1,230 @@
+{% extends "admin/layout.html" %}
+
+{% block admin_content %}
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2>🍽️ Meal Schedule Management</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Publish menus, define response windows, broadcast alerts, and manage meal statuses.
+      </p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="openModal('createMealModal')">
+      + Create New Meal
+    </button>
+  </div>
+
+  <!-- Meals Table -->
+  <div class="table-responsive">
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Date & Meal</th>
+          <th>Hostel Target</th>
+          <th>Menu Items</th>
+          <th>Response Deadline</th>
+          <th>Responses</th>
+          <th>Status</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for meal in meals %}
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: var(--neutral-dark);">
+                {{ meal.meal_date }}
+              </div>
+              <div style="font-size: 0.85rem; color: var(--neutral-muted); text-transform: capitalize;">
+                {% if meal.meal_type == 'breakfast' %}🍳 Breakfast
+                {% elif meal.meal_type == 'lunch' %}🍛 Lunch
+                {% elif meal.meal_type == 'dinner' %}🍲 Dinner
+                {% else %}☕ Snacks{% endif %}
+                @ {{ meal.meal_time }}
+              </div>
+            </td>
+
+            <td>
+              <span style="font-size: 0.85rem; color: var(--neutral-dark);">
+                {{ meal.hostel_name or 'All Hostels / Central Mess' }}
+              </span>
+            </td>
+
+            <td style="max-width: 280px;">
+              <div style="font-size: 0.85rem; color: var(--neutral-body); line-height: 1.4;">
+                {{ meal.menu_items }}
+              </div>
+            </td>
+
+            <td>
+              <div style="font-size: 0.85rem; font-weight: 600;">
+                {{ meal.response_deadline[11:16] }}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--neutral-muted);">
+                {{ meal.response_deadline[:10] }}
+              </div>
+            </td>
+
+            <td>
+              <div style="display: flex; gap: 0.35rem; font-size: 0.8rem;">
+                <span class="status-badge badge-will-eat" style="padding: 0.15rem 0.45rem;">
+                  🟢 {{ meal.confirmed_eating }}
+                </span>
+                <span class="status-badge badge-not-eating" style="padding: 0.15rem 0.45rem;">
+                  🔴 {{ meal.confirmed_not_eating }}
+                </span>
+                <span class="status-badge badge-unresponded" style="padding: 0.15rem 0.45rem;">
+                  🟡 {{ meal.no_response }}
+                </span>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--neutral-muted); margin-top: 0.25rem;">
+                Rate: {{ meal.response_rate }}%
+              </div>
+            </td>
+
+            <td>
+              {% if meal.status == 'open' %}
+                <span class="status-badge badge-open">🔵 Open</span>
+              {% elif meal.status == 'paused' %}
+                <span class="status-badge badge-unresponded" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a;">⏸️ Paused</span>
+              {% elif meal.status == 'closed' %}
+                <span class="status-badge badge-closed">🔒 Closed Early</span>
+              {% else %}
+                <span class="status-badge badge-cancelled">❌ Cancelled</span>
+              {% endif %}
+            </td>
+
+            <td style="text-align: right;">
+              <div style="display: inline-flex; gap: 0.35rem; align-items: center;">
+                {% if meal.status == 'open' %}
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="broadcastReminder({{ meal.id }}, this)" title="Send notification alert to unresponded residents">
+                    📢
+                  </button>
+                  <!-- Pause Responses -->
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;">
+                    <input type="hidden" name="status_val" value="paused">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Temporarily Pause Resident Responses">
+                      ⏸️ Pause
+                    </button>
+                  </form>
+                  <!-- Close Early -->
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;">
+                    <input type="hidden" name="status_val" value="closed">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Close Responses Early">
+                      🔒 Close
+                    </button>
+                  </form>
+                {% elif meal.status == 'paused' %}
+                  <!-- Resume Responses -->
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;">
+                    <input type="hidden" name="status_val" value="open">
+                    <button type="submit" class="btn btn-primary btn-sm" title="Resume Resident Responses">
+                      ▶️ Resume
+                    </button>
+                  </form>
+                  <!-- Close Early -->
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;">
+                    <input type="hidden" name="status_val" value="closed">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Close Responses Early">
+                      🔒 Close
+                    </button>
+                  </form>
+                {% elif meal.status == 'closed' %}
+                  <!-- Reopen Responses -->
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;">
+                    <input type="hidden" name="status_val" value="open">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Reopen Responses">
+                      🔓 Reopen
+                    </button>
+                  </form>
+                {% endif %}
+
+                {% if meal.status != 'cancelled' %}
+                  <form method="POST" action="/admin/meals/{{ meal.id }}/status" style="display: inline;" onsubmit="return confirm('Cancel this meal? Cancelled meals will not count toward food requirements.')">
+                    <input type="hidden" name="status_val" value="cancelled">
+                    <button type="submit" class="btn btn-sm btn-secondary" style="color: var(--danger);" title="Cancel Meal">
+                      Cancel
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: Create New Meal -->
+<div id="createMealModal" class="modal-overlay">
+  <div class="modal-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.25rem;">➕ Create New Meal</h3>
+      <button type="button" onclick="closeModal('createMealModal')" style="border: none; background: transparent; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+
+    <form method="POST" action="/admin/meals/create">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label class="form-label" for="meal_type">Meal Type *</label>
+          <select id="meal_type" name="meal_type" class="form-control" required>
+            <option value="breakfast">🍳 Breakfast</option>
+            <option value="lunch">🍛 Lunch</option>
+            <option value="dinner" selected>🍲 Dinner</option>
+            <option value="snacks">☕ Snacks</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="meal_date">Date *</label>
+          <input type="date" id="meal_date" name="meal_date" class="form-control" required>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label class="form-label" for="meal_time">Meal Time *</label>
+          <input type="time" id="meal_time" name="meal_time" class="form-control" value="19:30" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="response_deadline_time">Response Deadline Time *</label>
+          <input type="time" id="response_deadline_time" name="response_deadline_time" class="form-control" value="17:00" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="hostel_id">Target Hostel / Mess</label>
+        <select id="hostel_id" name="hostel_id" class="form-control">
+          <option value="all">Central / All Hostels</option>
+          {% for h in hostels %}
+            <option value="{{ h.id }}">{{ h.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="menu_items">Menu Items (comma-separated) *</label>
+        <textarea id="menu_items" name="menu_items" class="form-control" rows="3" placeholder="e.g. Rice, Dal Makhani, Paneer Butter Masala, Roti, Salad, Gulab Jamun" required></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createMealModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Publish Meal & Open Responses</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const dateInput = document.getElementById('meal_date');
+  if (dateInput && !dateInput.value) {
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+  }
+});
+</script>
+{% endblock %}

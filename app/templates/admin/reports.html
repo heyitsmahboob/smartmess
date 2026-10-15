@@ -1,0 +1,171 @@
+{% extends "admin/layout.html" %}
+
+{% block admin_content %}
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2>📑 Kitchen Demand & Food Wastage Reports</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Official audit report for hostel wardens, college management, and mess committees.
+      </p>
+    </div>
+
+    <!-- Export Button -->
+    <div>
+      <a href="/admin/reports/csv?start_date={{ start_date }}&end_date={{ end_date }}&hostel_id={{ selected_hostel or '' }}" 
+         class="btn btn-primary">
+        📥 Export Report to CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+    <form method="GET" action="/admin/reports" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-muted);">From:</label>
+        <input type="date" name="start_date" class="form-control" value="{{ start_date }}" style="width: auto;">
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-muted);">To:</label>
+        <input type="date" name="end_date" class="form-control" value="{{ end_date }}" style="width: auto;">
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--neutral-muted);">Hostel:</label>
+        <select name="hostel_id" class="form-control" style="width: auto;">
+          <option value="">All Hostels</option>
+          {% for h in hostels %}
+            <option value="{{ h.id }}" {% if selected_hostel and selected_hostel == h.id %}selected{% endif %}>
+              {{ h.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-secondary">Generate Report</button>
+    </form>
+  </div>
+
+  <!-- Summary Cards for Filtered Range -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Prepared Portions</div>
+      <div class="stat-value">{{ summary.total_prep }}</div>
+      <div class="stat-subtext">Cooked in selected period</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Total Diners Served</div>
+      <div class="stat-value" style="color: var(--secondary);">{{ summary.total_ate }}</div>
+      <div class="stat-subtext">Actual meals consumed</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Total Leftover Wastage</div>
+      <div class="stat-value" style="color: {% if summary.total_waste > 20 %}#ef4444{% else %}#059669{% endif %};">
+        {{ summary.total_waste }}
+      </div>
+      <div class="stat-subtext">Servings unconsumed</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Portions Saved vs 100% Cook</div>
+      <div class="stat-value" style="color: var(--primary-dark);">{{ summary.total_saved }}</div>
+      <div class="stat-subtext">Prevented through advance notice</div>
+    </div>
+  </div>
+
+  <!-- Detailed Audit Table -->
+  <div class="table-responsive">
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Date & Meal</th>
+          <th>Hostel</th>
+          <th>Menu</th>
+          <th>Responses (Eat / Not / None)</th>
+          <th>Response Rate</th>
+          <th>Prepared</th>
+          <th>Actual Diners</th>
+          <th>Leftovers</th>
+          <th>Wastage Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report_data %}
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: var(--neutral-dark);">
+                {{ row.meal_date }}
+              </div>
+              <div style="font-size: 0.8rem; color: var(--neutral-muted); text-transform: capitalize;">
+                {{ row.meal_type }}
+              </div>
+            </td>
+
+            <td>
+              <span style="font-size: 0.82rem;">{{ row.hostel_name or 'Central Mess' }}</span>
+            </td>
+
+            <td style="max-width: 200px;">
+              <div style="font-size: 0.8rem; color: var(--neutral-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ row.menu_items }}">
+                {{ row.menu_items }}
+              </div>
+            </td>
+
+            <td>
+              <div style="font-size: 0.82rem;">
+                <span style="color: var(--primary-dark); font-weight: 700;">{{ row.confirmed_eating }}</span> / 
+                <span style="color: #991b1b; font-weight: 700;">{{ row.confirmed_not_eating }}</span> / 
+                <span style="color: #b45309; font-weight: 700;">{{ row.no_response }}</span>
+              </div>
+            </td>
+
+            <td>
+              <span style="font-weight: 600;">{{ row.response_rate }}%</span>
+            </td>
+
+            <td>
+              {% if row.food_prepared_portions %}
+                <span style="font-weight: 700;">{{ row.food_prepared_portions }}</span>
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if row.actual_eaters %}
+                <span style="color: var(--secondary); font-weight: 700;">{{ row.actual_eaters }}</span>
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if row.estimated_wasted_portions is not none %}
+                <span style="color: {% if row.estimated_wasted_portions > 0 %}#ef4444{% else %}#059669{% endif %}; font-weight: 700;">
+                  {{ row.estimated_wasted_portions }}
+                </span>
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if row.food_prepared_portions %}
+                <span style="font-weight: 700; color: {% if row.wastage_rate > 5 %}#ef4444{% else %}#059669{% endif %};">
+                  {{ row.wastage_rate }}%
+                </span>
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

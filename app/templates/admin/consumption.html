@@ -1,0 +1,175 @@
+{% extends "admin/layout.html" %}
+
+{% block admin_content %}
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2>⚖️ Actual Post-Meal Consumption Entry</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Record actual kitchen output and attendance after each meal to feed machine-learning and wastage tracking.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Meal & Date</th>
+          <th>Demand Confirmed</th>
+          <th>Portions Prepared</th>
+          <th>Actual Eaters</th>
+          <th>Remaining Food</th>
+          <th>Estimated Wastage</th>
+          <th>Notes & Recorded By</th>
+          <th style="text-align: right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for meal in meals %}
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: var(--neutral-dark);">
+                {{ meal.meal_date }}
+              </div>
+              <div style="font-size: 0.85rem; color: var(--neutral-muted); text-transform: capitalize;">
+                {{ meal.meal_type }} ({{ meal.meal_time }})
+              </div>
+            </td>
+
+            <td>
+              <span class="status-badge badge-will-eat">
+                {{ meal.confirmed_eating }} Confirmed
+              </span>
+            </td>
+
+            <td>
+              {% if meal.food_prepared_portions is not none %}
+                <span style="font-weight: 700; font-size: 0.95rem;">{{ meal.food_prepared_portions }}</span> servings
+              {% else %}
+                <span style="color: var(--neutral-muted);">Not Entered</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if meal.actual_eaters is not none %}
+                <span style="font-weight: 700; color: var(--secondary); font-size: 0.95rem;">{{ meal.actual_eaters }}</span> people
+              {% else %}
+                <span style="color: var(--neutral-muted);">Pending</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if meal.remaining_portions is not none %}
+                <span style="font-weight: 700;">{{ meal.remaining_portions }}</span>
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if meal.estimated_wasted_portions is not none %}
+                {% if meal.estimated_wasted_portions > 0 %}
+                  <span class="status-badge badge-not-eating" style="font-size: 0.78rem;">
+                    ⚠️ {{ meal.estimated_wasted_portions }} wasted
+                  </span>
+                {% else %}
+                  <span class="status-badge badge-will-eat" style="font-size: 0.78rem;">
+                    🌟 Zero Waste
+                  </span>
+                {% endif %}
+              {% else %}
+                <span style="color: var(--neutral-muted);">-</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <div style="font-size: 0.8rem; color: var(--neutral-muted);">
+                {{ meal.notes or 'No notes' }}
+              </div>
+            </td>
+
+            <td style="text-align: right;">
+              <button 
+                type="button" 
+                class="btn btn-sm {% if meal.consumption_id %}btn-secondary{% else %}btn-primary{% endif %}"
+                onclick="openRecordConsumptionModal({{ meal.id }}, '{{ meal.meal_type|capitalize }} - {{ meal.meal_date }}', {{ meal.food_prepared_portions or (meal.confirmed_eating * 1.10)|round|int }}, {{ meal.actual_eaters or meal.confirmed_eating }}, {{ meal.remaining_portions or 0 }}, '{{ meal.notes or '' }}')">
+                {% if meal.consumption_id %}✏️ Edit Data{% else %}➕ Record Actuals{% endif %}
+              </button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: Record Consumption -->
+<div id="consumptionModal" class="modal-overlay">
+  <div class="modal-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 id="modalMealTitle" style="font-size: 1.25rem;">⚖️ Record Meal Consumption</h3>
+      <button type="button" onclick="closeModal('consumptionModal')" style="border: none; background: transparent; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+
+    <form method="POST" action="/admin/consumption/save">
+      <input type="hidden" id="modal_meal_id" name="meal_id">
+
+      <div class="form-group">
+        <label class="form-label" for="modal_food_prepared">1. Food Prepared (Total Portions Cooked) *</label>
+        <input type="number" id="modal_food_prepared" name="food_prepared_portions" class="form-control" required min="0" oninput="calculateConsumptionDiff()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="modal_actual_eaters">2. People Who Actually Ate (Headcount) *</label>
+        <input type="number" id="modal_actual_eaters" name="actual_eaters" class="form-control" required min="0" oninput="calculateConsumptionDiff()">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="modal_remaining_portions">3. Remaining Food Portions (Leftovers in Pots) *</label>
+        <input type="number" id="modal_remaining_portions" name="remaining_portions" class="form-control" required min="0">
+      </div>
+
+      <!-- Real-time calculation feedback -->
+      <div id="wasteCalculationPreview" style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 0.85rem; border-radius: var(--radius-md); margin-bottom: 1rem; font-size: 0.88rem;">
+        Estimated Food Wastage: <strong>0 servings</strong> (0.0% of prepared food)
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="modal_notes">Kitchen Observation Notes</label>
+        <input type="text" id="modal_notes" name="notes" class="form-control" placeholder="e.g. Rainy evening, fewer people came for dinner">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('consumptionModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Consumption Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openRecordConsumptionModal(mealId, title, prep, eaters, remaining, notes) {
+  document.getElementById('modal_meal_id').value = mealId;
+  document.getElementById('modalMealTitle').innerText = '⚖️ ' + title;
+  document.getElementById('modal_food_prepared').value = prep;
+  document.getElementById('modal_actual_eaters').value = eaters;
+  document.getElementById('modal_remaining_portions').value = remaining;
+  document.getElementById('modal_notes').value = notes;
+  calculateConsumptionDiff();
+  openModal('consumptionModal');
+}
+
+function calculateConsumptionDiff() {
+  const prep = parseInt(document.getElementById('modal_food_prepared').value) || 0;
+  const eaters = parseInt(document.getElementById('modal_actual_eaters').value) || 0;
+  const diff = Math.max(0, prep - eaters);
+  const rate = prep > 0 ? ((diff / prep) * 100).toFixed(1) : 0;
+
+  const preview = document.getElementById('wasteCalculationPreview');
+  if (preview) {
+    preview.innerHTML = `Estimated Wastage: <strong style="color: ${diff > 0 ? '#ef4444' : '#059669'};">${diff} servings</strong> (${rate}% of cooked food)`;
+  }
+}
+</script>
+{% endblock %}

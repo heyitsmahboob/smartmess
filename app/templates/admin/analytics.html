@@ -1,0 +1,142 @@
+{% extends "admin/layout.html" %}
+
+{% block admin_content %}
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2>📈 Food Waste & Consumption Analytics</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.92rem;">
+        Understand meal participation, audit kitchen wastage, and quantify financial & environmental savings.
+      </p>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <a href="/admin/analytics?days=7" class="btn btn-sm {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %}">Last 7 Days</a>
+      <a href="/admin/analytics?days=14" class="btn btn-sm {% if days == 14 %}btn-primary{% else %}btn-secondary{% endif %}">Last 14 Days</a>
+      <a href="/admin/analytics?days=30" class="btn btn-sm {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %}">Last 30 Days</a>
+    </div>
+  </div>
+
+  <!-- Key Analytics KPIs -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Average Response Rate</div>
+      <div class="stat-value" style="color: var(--secondary);">{{ stats.avg_response_rate }}%</div>
+      <div class="stat-subtext">Responses / Total Residents</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Average Kitchen Wastage Rate</div>
+      <div class="stat-value" style="color: {% if stats.avg_wastage_rate < 5 %}#059669{% else %}#ef4444{% endif %};">
+        {{ stats.avg_wastage_rate }}%
+      </div>
+      <div class="stat-subtext">Wasted / Prepared Portions</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Estimated Food Portions Saved</div>
+      <div class="stat-value" style="color: var(--primary-dark);">{{ stats.portions_saved }}</div>
+      <div class="stat-subtext">vs cooking blindly for 100% capacity</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Estimated Cost Saved (₹)</div>
+      <div class="stat-value" style="color: #047857;">₹{{ "{:,}".format(stats.estimated_cost_saved_inr) }}</div>
+      <div class="stat-subtext">Procurement & gas savings (@ ₹55/meal)</div>
+    </div>
+  </div>
+
+  <!-- Charts Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Chart 1: Expected vs Actual -->
+    <div class="card">
+      <div style="margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem;">📊 Expected Demand vs Actual Diners</h3>
+        <p style="font-size: 0.82rem; color: var(--neutral-muted);">Comparing planned portions (with safety buffer) vs actual headcount.</p>
+      </div>
+      <div style="position: relative; height: 280px;">
+        <canvas id="expectedVsActualChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 2: Daily Wastage Trend -->
+    <div class="card">
+      <div style="margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem;">📉 Food Wastage Trend</h3>
+        <p style="font-size: 0.82rem; color: var(--neutral-muted);">Daily unused portions over time as resident response compliance grows.</p>
+      </div>
+      <div style="position: relative; height: 280px;">
+        <canvas id="wastageTrendChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Row: Meal Type Breakdown and Table -->
+  <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: flex-start;">
+    <!-- Donut: Meal Type Breakdown -->
+    <div class="card">
+      <div style="margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem;">🍽️ Meal-wise Headcount</h3>
+        <p style="font-size: 0.82rem; color: var(--neutral-muted);">Average eaters across breakfast, lunch, and dinner.</p>
+      </div>
+      <div style="position: relative; height: 230px;">
+        <canvas id="mealTypeChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Daily Wastage Summary Table -->
+    <div class="card">
+      <div style="margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem;">🗓️ Daily Aggregated Waste Log</h3>
+        <p style="font-size: 0.82rem; color: var(--neutral-muted);">Summary of prepared food, consumption, and efficiency.</p>
+      </div>
+      <div class="table-responsive" style="max-height: 250px;">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Food Prepared</th>
+              <th>Total Diners</th>
+              <th>Leftover Food</th>
+              <th>Efficiency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in stats.daily_trend|reverse %}
+              <tr>
+                <td style="font-weight: 600;">{{ row.meal_date }}</td>
+                <td>{{ row.daily_prepared }} servings</td>
+                <td>{{ row.daily_eaters }} people</td>
+                <td>
+                  {% if row.daily_wasted > 0 %}
+                    <span style="color: #ef4444; font-weight: 600;">{{ row.daily_wasted }} servings</span>
+                  {% else %}
+                    <span style="color: #059669; font-weight: 600;">0 (Zero Waste)</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% set eff = ((row.daily_eaters / row.daily_prepared * 100)|round(1)) if row.daily_prepared > 0 else 100 %}
+                  <span style="font-weight: 700; color: {% if eff >= 95 %}#059669{% else %}#0284c7{% endif %};">
+                    {{ eff }}%
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/js/charts.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const statsData = {{ stats|tojson }};
+  initAnalyticsCharts(statsData);
+});
+</script>
+{% endblock %}

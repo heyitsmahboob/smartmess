@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}My Meals - SmartMess{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 1.5rem; padding-bottom: 3rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div>
+      <h2>📅 My Meals Planner</h2>
+      <p style="color: var(--neutral-muted); font-size: 0.95rem;">
+        Review and respond to meals in advance to help the kitchen procure and cook with zero waste.
+      </p>
+    </div>
+    <div>
+      <a href="/dashboard" class="btn btn-primary btn-sm">Today's Fast View &rarr;</a>
+    </div>
+  </div>
+
+  <!-- Sections: Today, Tomorrow, Upcoming -->
+  {% for section_key, section_title, badge_icon in [
+      ('today', "Today's Meals", '⚡'),
+      ('tomorrow', "Tomorrow's Meals", '🌅'),
+      ('upcoming', "Upcoming Meals This Week", '📆'),
+      ('past', "Recent Past Meals History", '📜')
+  ] %}
+    {% set section_meals = meals_by_section[section_key] %}
+    {% if section_meals %}
+      <div style="margin-bottom: 2rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.85rem;">
+          <span style="font-size: 1.25rem;">{{ badge_icon }}</span>
+          <h3 style="font-size: 1.2rem; color: var(--neutral-dark);">{{ section_title }}</h3>
+          <span style="font-size: 0.8rem; background: #e2e8f0; color: #475569; padding: 0.15rem 0.55rem; border-radius: 9999px; font-weight: 600;">
+            {{ section_meals|length }}
+          </span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>Date & Meal</th>
+                <th>Menu</th>
+                <th>Response Deadline</th>
+                <th>My Response</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for meal in section_meals %}
+                <tr>
+                  <!-- Date & Meal Type -->
+                  <td>
+                    <div style="font-weight: 700; color: var(--neutral-dark);">
+                      {{ meal.date_display }}
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--neutral-muted); text-transform: capitalize;">
+                      {% if meal.meal_type == 'breakfast' %}🍳 Breakfast
+                      {% elif meal.meal_type == 'lunch' %}🍛 Lunch
+                      {% elif meal.meal_type == 'dinner' %}🍲 Dinner
+                      {% else %}☕ Snacks{% endif %}
+                      ({{ meal.time_display }})
+                    </div>
+                  </td>
+
+                  <!-- Menu Items -->
+                  <td style="max-width: 320px;">
+                    <div>
+                      {% for item in meal.menu_items.split(',') %}
+                        <span class="menu-tag" style="margin-bottom: 0.2rem; font-size: 0.78rem;">{{ item.strip() }}</span>
+                      {% endfor %}
+                    </div>
+                  </td>
+
+                  <!-- Deadline -->
+                  <td>
+                    <div style="font-size: 0.88rem; font-weight: 600;">
+                      {{ meal.deadline_display }}
+                    </div>
+                    {% if meal.is_locked %}
+                      <span style="font-size: 0.75rem; color: var(--neutral-muted);">🔒 Closed</span>
+                    {% else %}
+                      <span style="font-size: 0.75rem; color: var(--primary); font-weight: 600;">⏳ Open</span>
+                    {% endif %}
+                  </td>
+
+                  <!-- My Response Status -->
+                  <td>
+                    <span id="table-status-{{ meal.id }}">
+                      {% if meal.user_response == 'will_eat' %}
+                        <span class="status-badge badge-will-eat">🟢 Will Eat</span>
+                      {% elif meal.user_response == 'not_eating' %}
+                        <span class="status-badge badge-not-eating">🔴 Not Eating</span>
+                      {% else %}
+                        <span class="status-badge badge-unresponded">🟡 No Response</span>
+                      {% endif %}
+                    </span>
+                  </td>
+
+                  <!-- Action Buttons -->
+                  <td style="text-align: right;">
+                    {% if meal.is_locked %}
+                      <span style="font-size: 0.82rem; color: var(--neutral-muted);">Locked</span>
+                    {% else %}
+                      <div style="display: inline-flex; gap: 0.4rem;">
+                        <button 
+                          type="button" 
+                          class="btn btn-sm {% if meal.user_response == 'will_eat' %}btn-primary{% else %}btn-secondary{% endif %}"
+                          onclick="quickRespondTable({{ meal.id }}, 'will_eat', this)">
+                          Will Eat
+                        </button>
+                        <button 
+                          type="button" 
+                          class="btn btn-sm {% if meal.user_response == 'not_eating' %}btn-danger{% else %}btn-secondary{% endif %}"
+                          onclick="quickRespondTable({{ meal.id }}, 'not_eating', this)">
+                          Won't Eat
+                        </button>
+                      </div>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<script>
+async function quickRespondTable(mealId, choice, btnEl) {
+  try {
+    const res = await fetch(`/api/meals/${mealId}/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response: choice })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.detail || 'Could not update response', 'error');
+      return;
+    }
+    showToast(choice === 'will_eat' ? 'Marked: Will Eat' : 'Marked: Not Eating', 'success');
+    
+    // Update badge in table row
+    const badgeSpan = document.getElementById(`table-status-${mealId}`);
+    if (badgeSpan) {
+      if (choice === 'will_eat') {
+        badgeSpan.innerHTML = '<span class="status-badge badge-will-eat">🟢 Will Eat</span>';
+      } else {
+        badgeSpan.innerHTML = '<span class="status-badge badge-not-eating">🔴 Not Eating</span>';
+      }
+    }
+    // Refresh page briefly or update buttons
+    setTimeout(() => window.location.reload(), 700);
+  } catch (err) {
+    showToast('Failed to record response', 'error');
+  }
+}
+</script>
+{% endblock %}

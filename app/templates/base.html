@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>{% block title %}SmartMess - Intelligent Food Demand & Waste Reduction{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <!-- Main Top Navigation -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="brand-logo">
+        <div class="brand-icon">🌱</div>
+        <span>SmartMess</span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="nav-links desktop-nav">
+        {% if user %}
+          {% if user.is_admin %}
+            <a href="/admin/dashboard" class="nav-item">Dashboard</a>
+            <a href="/admin/meals" class="nav-item">Meals</a>
+            <a href="/admin/consumption" class="nav-item">Consumption</a>
+            <a href="/admin/users" class="nav-item">Residents</a>
+            <a href="/admin/analytics" class="nav-item">Analytics</a>
+            <a href="/admin/reports" class="nav-item">Reports</a>
+            <div class="user-profile-badge">
+              <span class="avatar-circle">A</span>
+              <span>Admin: {{ user.full_name }}</span>
+            </div>
+            <a href="/logout" class="btn btn-secondary btn-sm">Logout</a>
+          {% else %}
+            <a href="/dashboard" class="nav-item">Today's Meals</a>
+            <a href="/my-meals" class="nav-item">My Meals</a>
+            <a href="/notifications" class="nav-item">
+              Notifications
+              {% if unread_notifications and unread_notifications > 0 %}
+                <span class="nav-badge" id="unread-notif-pill">{{ unread_notifications }}</span>
+              {% endif %}
+            </a>
+            <div class="user-profile-badge">
+              <span class="avatar-circle">{{ user.full_name[0] }}</span>
+              <span>{{ user.full_name.split(' ')[0] }} ({{ user.room_number or 'Room' }})</span>
+            </div>
+            <a href="/logout" class="btn btn-secondary btn-sm">Logout</a>
+          {% endif %}
+        {% else %}
+          <a href="/login" class="nav-item">Student Login</a>
+          <a href="/register" class="btn btn-primary btn-sm">Register</a>
+          <a href="/admin/login" class="btn btn-secondary btn-sm">Admin Portal</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Content -->
+  <main style="flex: 1;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Mobile Bottom Navigation (for Hostel Residents on mobile) -->
+  {% if user and not user.is_admin %}
+  <nav class="mobile-bottom-nav">
+    <a href="/dashboard" class="mobile-nav-item {% if request.url.path == '/dashboard' %}active{% endif %}">
+      <span class="mobile-nav-icon">🍽️</span>
+      <span>Today</span>
+    </a>
+    <a href="/my-meals" class="mobile-nav-item {% if request.url.path == '/my-meals' %}active{% endif %}">
+      <span class="mobile-nav-icon">📅</span>
+      <span>My Meals</span>
+    </a>
+    <a href="/notifications" class="mobile-nav-item {% if request.url.path == '/notifications' %}active{% endif %}">
+      <span class="mobile-nav-icon">🔔</span>
+      <span>Alerts</span>
+      {% if unread_notifications and unread_notifications > 0 %}
+        <span class="nav-badge" style="position: absolute; top: -4px; right: 8px;">{{ unread_notifications }}</span>
+      {% endif %}
+    </a>
+    <a href="/logout" class="mobile-nav-item">
+      <span class="mobile-nav-icon">🚪</span>
+      <span>Exit</span>
+    </a>
+  </nav>
+  {% endif %}
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
