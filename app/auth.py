@@ -6,7 +6,7 @@ import time
 import secrets
 from typing import Optional, Dict, Any
 from fastapi import Request, HTTPException, status
-from app.config import SECRET_KEY, COOKIE_NAME
+from app.config import SECRET_KEY, COOKIE_NAME, STUDENT_COOKIE_NAME, ADMIN_COOKIE_NAME
 from app.database import db_session
 
 def hash_password(password: str) -> str:
@@ -62,22 +62,17 @@ def decode_session_token(token: str) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
-def get_current_user_from_request(request: Request) -> Optional[Dict[str, Any]]:
-    token = request.cookies.get(COOKIE_NAME)
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+def _get_user_from_token(token: Optional[str], expected_role: Optional[str] = None) -> Optional[Dict[str, Any]]:
     if not token:
         return None
-    
     payload = decode_session_token(token)
     if not payload:
         return None
 
-    # Fetch user details from database
     user_id = payload.get("sub")
     role = payload.get("role")
+    if expected_role and role != expected_role:
+        return None
 
     with db_session() as conn:
         cursor = conn.cursor()
@@ -120,3 +115,44 @@ def get_current_user_from_request(request: Request) -> Optional[Dict[str, Any]]:
                     "is_admin": False
                 }
     return None
+
+def get_current_resident_from_request(request: Request) -> Optional[Dict[str, Any]]:
+    # 1. Try student-specific cookie
+    token = request.cookies.get(STUDENT_COOKIE_NAME)
+    res = _get_user_from_token(token, expected_role="resident")
+    if res:
+        return res
+    # 2. Try legacy cookie if it contains resident
+    token = request.cookies.get(COOKIE_NAME)
+    res = _get_user_from_token(token, expected_role="resident")
+    if res:
+        return res
+    # 3. Try Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return _get_user_from_token(auth_header[7:], expected_role="resident")
+    return None
+
+def get_current_admin_from_request(request: Request) -> Optional[Dict[str, Any]]:
+    # 1. Try admin-specific cookie
+    token = request.cookies.get(ADMIN_COOKIE_NAME)
+    adm = _get_user_from_token(token, expected_role="admin")
+    if adm:
+        return adm
+    # 2. Try legacy cookie if it contains admin
+    token = request.cookies.get(COOKIE_NAME)
+    adm = _get_user_from_token(token, expected_role="admin")
+    if adm:
+        return adm
+    # 3. Try Authorization header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return _get_user_from_token(auth_header[7:], expected_role="admin")
+    return None
+
+def get_current_user_from_request(request: Request) -> Optional[Dict[str, Any]]:
+    path = request.url.path
+    if path.startswith("/admin"):
+        return get_current_admin_from_request(request) or get_current_resident_from_request(request)
+    else:
+        return get_current_resident_from_request(request) or get_current_admin_from_request(request)

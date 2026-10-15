@@ -6,6 +6,8 @@ DB_PATH = BASE_DIR / "smartmess.db"
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "smartmess-super-secret-production-key-2026")
 COOKIE_NAME = "smartmess_session"
+STUDENT_COOKIE_NAME = "smartmess_student_session"
+ADMIN_COOKIE_NAME = "smartmess_admin_session"
 
 # Food estimation defaults
 DEFAULT_BUFFER_PERCENT = 10.0

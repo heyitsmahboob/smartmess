@@ -4,9 +4,11 @@ from app.auth import (
     hash_password,
     verify_password,
     create_session_token,
-    get_current_user_from_request
+    get_current_user_from_request,
+    get_current_resident_from_request,
+    get_current_admin_from_request
 )
-from app.config import COOKIE_NAME
+from app.config import COOKIE_NAME, STUDENT_COOKIE_NAME, ADMIN_COOKIE_NAME
 from app.database import db_session
 from app.common import render_template
 
@@ -14,10 +16,9 @@ router = APIRouter()
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = None, success: str = None):
-    user = get_current_user_from_request(request)
-    if user:
-        if user.get("is_admin"):
-            return RedirectResponse("/admin/dashboard", status_code=status.HTTP_302_FOUND)
+    # Only redirect if already logged in as a resident
+    resident = get_current_resident_from_request(request)
+    if resident:
         return RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
     
     return render_template(request, "auth/login.html", {
@@ -56,6 +57,14 @@ async def login_submit(
 
         token = create_session_token({"sub": user["id"], "role": "resident", "name": user["full_name"]})
         redirect_res = RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
+        # Dedicated student cookie
+        redirect_res.set_cookie(
+            key=STUDENT_COOKIE_NAME,
+            value=token,
+            max_age=7 * 86400,
+            httponly=True,
+            samesite="lax"
+        )
         redirect_res.set_cookie(
             key=COOKIE_NAME,
             value=token,
@@ -135,6 +144,7 @@ async def register_submit(
 
         token = create_session_token({"sub": new_user_id, "role": "resident", "name": full_name.strip()})
         res = RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
+        res.set_cookie(key=STUDENT_COOKIE_NAME, value=token, max_age=7 * 86400, httponly=True, samesite="lax")
         res.set_cookie(key=COOKIE_NAME, value=token, max_age=7 * 86400, httponly=True, samesite="lax")
         return res
 
@@ -169,8 +179,9 @@ async def forgot_password_submit(
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request, error: str = None):
-    user = get_current_user_from_request(request)
-    if user and user.get("is_admin"):
+    # Only redirect if already logged in as admin
+    admin = get_current_admin_from_request(request)
+    if admin:
         return RedirectResponse("/admin/dashboard", status_code=status.HTTP_302_FOUND)
 
     return render_template(request, "auth/admin_login.html", {
@@ -196,13 +207,26 @@ async def admin_login_submit(
 
         token = create_session_token({"sub": admin["id"], "role": "admin", "name": admin["full_name"]})
         res = RedirectResponse("/admin/dashboard", status_code=status.HTTP_302_FOUND)
-        res.set_cookie(key=COOKIE_NAME, value=token, max_age=7 * 86400, httponly=True, samesite="lax")
+        # Dedicated admin cookie: DOES NOT overwrite or touch student cookie!
+        res.set_cookie(key=ADMIN_COOKIE_NAME, value=token, max_age=7 * 86400, httponly=True, samesite="lax")
         return res
+
+@router.get("/admin/logout")
+async def admin_logout(request: Request):
+    res = RedirectResponse("/admin/login", status_code=status.HTTP_302_FOUND)
+    res.delete_cookie(ADMIN_COOKIE_NAME)
+    return res
 
 @router.get("/logout")
 async def logout(request: Request):
-    user = get_current_user_from_request(request)
-    redirect_target = "/admin/login" if (user and user.get("is_admin")) else "/login"
-    res = RedirectResponse(redirect_target, status_code=status.HTTP_302_FOUND)
+    # If called from admin area, log out admin
+    if request.url.path.startswith("/admin") or request.headers.get("referer", "").endswith("/admin"):
+        res = RedirectResponse("/admin/login", status_code=status.HTTP_302_FOUND)
+        res.delete_cookie(ADMIN_COOKIE_NAME)
+        return res
+
+    # Otherwise log out student resident
+    res = RedirectResponse("/login", status_code=status.HTTP_302_FOUND)
+    res.delete_cookie(STUDENT_COOKIE_NAME)
     res.delete_cookie(COOKIE_NAME)
     return res

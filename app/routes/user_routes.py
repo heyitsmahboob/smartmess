@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, status, Body
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from datetime import datetime
-from app.auth import get_current_user_from_request
+from app.auth import get_current_user_from_request, get_current_resident_from_request, get_current_admin_from_request
 from app.database import db_session
 from app.services.notification import notification_service
 from app.common import render_template
@@ -18,12 +18,10 @@ from app.time_utils import (
 router = APIRouter()
 
 def require_resident(request: Request):
-    user = get_current_user_from_request(request)
-    if not user:
+    resident = get_current_resident_from_request(request)
+    if not resident:
         raise HTTPException(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers={"Location": "/login"})
-    if user.get("is_admin"):
-        raise HTTPException(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers={"Location": "/admin/dashboard"})
-    return user
+    return resident
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def user_dashboard(request: Request):
@@ -194,7 +192,7 @@ async def respond_to_meal(
     request: Request,
     payload: dict = Body(...)
 ):
-    user = get_current_user_from_request(request)
+    user = get_current_resident_from_request(request) or get_current_user_from_request(request)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 

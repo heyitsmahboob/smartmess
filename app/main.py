@@ -5,7 +5,7 @@ from pathlib import Path
 from app.config import BASE_DIR
 from app.database import init_db
 from app.seed_data import seed_database
-from app.auth import get_current_user_from_request
+from app.auth import get_current_resident_from_request, get_current_admin_from_request, get_current_user_from_request
 from app.routes.auth_routes import router as auth_router
 from app.routes.user_routes import router as user_router
 from app.routes.admin_routes import router as admin_router
@@ -35,9 +35,10 @@ app.include_router(api_router)
 
 @app.get("/")
 async def root(request: Request):
-    user = get_current_user_from_request(request)
-    if user:
-        if user.get("is_admin"):
-            return RedirectResponse("/admin/dashboard")
+    resident = get_current_resident_from_request(request)
+    admin = get_current_admin_from_request(request)
+    if resident:
         return RedirectResponse("/dashboard")
+    elif admin:
+        return RedirectResponse("/admin/dashboard")
     return RedirectResponse("/login")

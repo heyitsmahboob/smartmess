@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, status, Form, Query, Resp
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, PlainTextResponse
 from datetime import timedelta
 from typing import Optional
-from app.auth import get_current_user_from_request, hash_password
+from app.auth import get_current_admin_from_request, get_current_user_from_request, hash_password
 from app.database import db_session
 from app.services.estimation import calculate_meal_requirement
 from app.services.analytics import get_analytics_summary
@@ -22,13 +22,13 @@ from app.time_utils import (
 router = APIRouter(prefix="/admin")
 
 def require_admin(request: Request):
-    user = get_current_user_from_request(request)
-    if not user or not user.get("is_admin"):
+    admin = get_current_admin_from_request(request)
+    if not admin:
         raise HTTPException(
             status_code=status.HTTP_307_TEMPORARY_REDIRECT,
             headers={"Location": "/admin/login"}
         )
-    return user
+    return admin
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(
